@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FrigoSafe PRO - Inspeção de Segurança em Frigoríficos</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome para ícones técnicos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Fonte Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        canvas.sig-pad {
+            touch-action: none;
+            cursor: crosshair;
+        }
+        @media print {
+            body {
+                background-color: #ffffff !important;
+                color: #0f172a !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            #report-view {
+                display: block !important;
+                box-shadow: none !important;
+                border: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                max-width: 100% !important;
+            }
+            .page-break-inside-avoid {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen pb-24">
+
+    <!-- ==================== CABEÇALHO FIXO ==================== -->
+    <header class="sticky top-0 z-40 bg-slate-900 text-white shadow-lg border-b border-slate-800 no-print">
+        <div class="max-w-5xl mx-auto px-4 py-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-400">
+                        <i class="fa-solid fa-snowflake text-xl"></i>
+                    </div>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h1 class="font-extrabold text-sm sm:text-base tracking-tight text-white uppercase">FRIGORÍFICO SILVA INDÚSTRIA E COMÉRCIO LTDA</h1>
+                            <span class="text-[10px] font-bold uppercase tracking-wider bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full border border-cyan-500/30">NR-12 • NR-13 • NR-23 • BPF</span>
+                        </div>
+                        <p class="text-xs text-slate-400">FrigoSafe PRO • Inspeção de Segurança do Trabalho & Sanitária</p>
+                    </div>
+                </div>
+
+                <!-- Botões de Ação Rápida no Header -->
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="toggleHistoryModal(true)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-semibold flex items-center gap-2 border border-slate-700 transition">
+                        <i class="fa-solid fa-clock-rotate-left text-cyan-400"></i>
+                        <span class="hidden sm:inline">Histórico</span>
+                        <span id="history-badge" class="bg-cyan-600 text-white text-[11px] px-1.5 py-0.2 rounded-full">0</span>
+                    </button>
+                    <button type="button" onclick="resetNewInspection()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-rose-950/60 hover:border-rose-700 text-slate-200 text-xs sm:text-sm font-semibold flex items-center gap-2 border border-slate-700 transition" title="Iniciar nova inspeção">
+                        <i class="fa-solid fa-file-circle-plus text-emerald-400"></i>
+                        <span class="hidden sm:inline">Nova</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Barra de Progresso e Indicadores em Tempo Real -->
+            <div class="mt-3 pt-2.5 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                <div class="flex items-center gap-3">
+                    <div class="flex-1 bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                        <div id="progress-bar" class="bg-gradient-to-r from-cyan-500 to-emerald-400 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                    <span id="progress-text" class="text-xs font-bold text-slate-300 whitespace-nowrap">0 / 23 itens</span>
+                </div>
+                <div class="flex items-center justify-between sm:justify-end gap-2 text-xs font-semibold">
+                    <span class="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                        <i class="fa-solid fa-check mr-1"></i><span id="stat-c">0</span> Conf.
+                    </span>
+                    <span class="px-2.5 py-1 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                        <i class="fa-solid fa-xmark mr-1"></i><span id="stat-nc">0</span> Não Conf.
+                    </span>
+                    <span class="px-2.5 py-1 rounded-lg bg-slate-700/70 text-slate-300 border border-slate-600">
+                        <i class="fa-solid fa-minus mr-1"></i><span id="stat-na">0</span> N/A
+                    </span>
+                    <span id="stat-score" class="px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold">
+                        --%
+                    </span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ==================== CONTAINER PRINCIPAL DO FORMULÁRIO ==================== -->
+    <main id="form-view" class="max-w-5xl mx-auto px-4 pt-6 space-y-6 no-print">
+
+        <!-- 1. IDENTIFICAÇÃO DA INSPEÇÃO -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="bg-slate-800 text-white px-5 py-3.5 flex items-center gap-3">
+                <i class="fa-solid fa-clipboard-user text-cyan-400 text-lg"></i>
+                <h2 class="font-bold text-base sm:text-lg">1. Identificação da Inspeção</h2>
+            </div>
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Unidade / Empresa *</label>
+                    <select id="meta-unidade" onchange="saveCurrentState()"
+                        class="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:border-cyan-600 focus:ring-2 focus:ring-cyan-500/20 outline-none font-semibold text-slate-900">
+                        <option value="Frigorífico Silva" selected>Frigorífico Silva</option>
+                        <option value="Graxaria">Graxaria</option>
+                        <option value="Transportadora Arrieche">Transportadora Arrieche</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Setor / Área Inspecionada *</label>
+                    <select id="meta-setor" onchange="saveCurrentState()"
+                        class="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:border-cyan-600 focus:ring-2 focus:ring-cyan-500/20 outline-none font-medium text-slate-900">
+                        <option value="Abate / Sangria / Evisceração">Abate / Sangria / Evisceração</option>
+                        <option value="Desossa e Sala de Cortes" selected>Desossa e Sala de Cortes</option>
+                        <option value="Sala de Máquinas (Refrigeração / Amônia NH3)">Sala de Máquinas (Refrigeração / Amônia NH3)</option>
+                        <option value="Casa de Caldeiras e Vasos de Pressão">Casa de Caldeiras e Vasos de Pressão</option>
+                        <option value="Túnel de Congelamento / Câmaras Frias">Túnel de Congelamento / Câmaras Frias</option>
+                        <option value="Processamento Graxaria (Digestores / Prensas)">Processamento Graxaria (Digestores / Prensas)</option>
+                        <option value="Pátio, Frota e Oficina (Transportadora)">Pátio, Frota e Oficina (Transportadora)</option>
+                        <option value="Embalagem, Expedição e Docas">Embalagem, Expedição e Docas</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Turno / Temperatura Ambiente</label>
+                    <select id="meta-turno" onchange="saveCurrentState()"
+                        class="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:border-cyan-600 focus:ring-2 focus:ring-cyan-500/20 outline-none font-medium text-slate-900">
+                        <option value="1º Turno (Manhã)">1º Turno (Manhã)</option>
+                        <option value="2º Turno (Tarde/Noite)">2º Turno (Tarde/Noite)</option>
+                        <option value="3º Turno (Higienização / Madrugada)">3º Turno (Higienização / Madrugada)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Técnico / Inspetor SST *</label>
+                    <input type="text" id="meta-inspetor" oninput="saveCurrentState()" placeholder="Nome completo e registro (MTE/CREA)"
+                        class="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:border-cyan-600 focus:ring-2 focus:ring-cyan-500/20 outline-none font-medium text-slate-900">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Supervisor / Encarregado da Área *</label>
+                    <input type="text" id="meta-supervisor" oninput="saveCurrentState()" placeholder="Nome do responsável acompanhante"
+                        class="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:border-cyan-600 focus:ring-2 focus:ring-cyan-500/20 outline-none font-medium text-slate-900">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Data e Hora da Ronda</label>
+                    <div class="flex gap-2">
+                        <input type="datetime-local" id="meta-datahora" onchange="saveCurrentState()"
+                            class="w-full px-3 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:border-cyan-600 outline-none font-medium text-slate-900 text-sm">
+                        <button type="button" onclick="setNowDateTime()" class="px-3 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs whitespace-nowrap" title="Atualizar para agora">
+                            Agora
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. CHECKLIST DE VERIFICAÇÃO NORMATIVA -->
+        <section class="space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+                <div>
+                    <h2 class="font-extrabold text-lg sm:text-xl text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-cyan-600"></i>
+                        2. Checklist de Verificação (NR-12 / NR-13 / NR-23 / NH₃ / BPF)
+                    </h2>
+                    <p class="text-xs sm:text-sm text-slate-500">Avalie cada requisito e registre evidências fotográficas em caso de Não Conformidade.</p>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="markAllAs('C')" class="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition">
+                        <i class="fa-solid fa-check-double mr-1"></i>Marcar Todos Conforme
+                    </button>
+                </div>
+            </div>
+
+            <!-- Container dinâmico das categorias -->
+            <div id="checklist-container" class="space-y-5"></div>
+        </section>
+
+        <!-- 3. GALERIA GERAL E PARECER TÉCNICO -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="bg-slate-800 text-white px-5 py-3.5 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-camera-retro text-cyan-400 text-lg"></i>
+                    <h2 class="font-bold text-base sm:text-lg">3. Registro Fotográfico Geral & Parecer Técnico</h2>
+                </div>
+                <label for="general-photo-input" class="cursor-pointer px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow transition">
+                    <i class="fa-solid fa-camera"></i>
+                    <span>Adicionar Foto</span>
+                </label>
+                <input type="file" id="general-photo-input" accept="image/*" capture="environment" class="hidden" onchange="handleGeneralPhotoUpload(event)">
+            </div>
+
+            <div class="p-5 space-y-5">
+                <!-- Grid de fotos gerais -->
+                <div id="general-photos-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    <div id="no-general-photos" class="col-span-full py-8 border-2 border-dashed border-slate-200 rounded-2xl text-center text-slate-400">
+                        <i class="fa-regular fa-images text-3xl mb-2 block text-slate-300"></i>
+                        <p class="text-sm font-medium">Nenhuma foto geral anexada ainda.</p>
+                        <p class="text-xs mt-1">Use o botão "Adicionar Foto" acima para registrar panorâmicas do setor.</p>
+                    </div>
+                </div>
+
+                <!-- Parecer Técnico / Plano de Ação -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
+                        Parecer Técnico Final / Recomendações Imediatas (Bloqueio / Interdição / Prazos)
+                    </label>
+                    <textarea id="meta-parecer" rows="3" oninput="saveCurrentState()"
+                        placeholder="Descreva o resumo geral das condições encontradas, medidas imediatas adotadas e prazos para correção das não conformidades..."
+                        class="w-full px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:border-cyan-600 focus:ring-2 focus:ring-cyan-500/20 outline-none text-sm text-slate-900"></textarea>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. ASSINATURAS DIGITAIS -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="bg-slate-800 text-white px-5 py-3.5 flex items-center gap-3">
+                <i class="fa-solid fa-signature text-cyan-400 text-lg"></i>
+                <h2 class="font-bold text-base sm:text-lg">4. Assinaturas Digitais de Validação</h2>
+            </div>
+
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Assinatura do Inspetor -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Assinatura do Inspetor / Técnico SST *
+                        </label>
+                        <button type="button" onclick="clearSignature('inspector')" class="text-xs font-semibold text-rose-600 hover:text-rose-700 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 transition">
+                            <i class="fa-solid fa-eraser mr-1"></i>Limpar
+                        </button>
+                    </div>
+                    <div class="relative rounded-2xl border-2 border-slate-300 bg-slate-50 overflow-hidden h-44">
+                        <canvas id="sig-inspector" class="sig-pad w-full h-full block"></canvas>
+                        <div id="sig-inspector-placeholder" class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-slate-400">
+                            <i class="fa-solid fa-pen-nib text-xl mb-1 opacity-50"></i>
+                            <span class="text-xs font-medium">Assine aqui com o dedo ou mouse</span>
+                        </div>
+                    </div>
+                    <p id="sig-inspector-label" class="text-xs text-slate-500 font-medium truncate">Inspetor: Não informado</p>
+                </div>
+
+                <!-- Assinatura do Supervisor -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-bold uppercase tracking-wider text-slate-700">
+                            Assinatura do Supervisor / Responsável *
+                        </label>
+                        <button type="button" onclick="clearSignature('supervisor')" class="text-xs font-semibold text-rose-600 hover:text-rose-700 px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 transition">
+                            <i class="fa-solid fa-eraser mr-1"></i>Limpar
+                        </button>
+                    </div>
+                    <div class="relative rounded-2xl border-2 border-slate-300 bg-slate-50 overflow-hidden h-44">
+                        <canvas id="sig-supervisor" class="sig-pad w-full h-full block"></canvas>
+                        <div id="sig-supervisor-placeholder" class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-slate-400">
+                            <i class="fa-solid fa-pen-nib text-xl mb-1 opacity-50"></i>
+                            <span class="text-xs font-medium">Assine aqui com o dedo ou mouse</span>
+                        </div>
+                    </div>
+                    <p id="sig-supervisor-label" class="text-xs text-slate-500 font-medium truncate">Supervisor: Não informado</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- BOTÕES DE FINALIZAÇÃO -->
+        <div class="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2">
+            <button type="button" onclick="saveInspectionToHistory()" class="w-full sm:w-auto px-6 py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm sm:text-base shadow-md flex items-center justify-center gap-2 transition">
+                <i class="fa-solid fa-floppy-disk text-cyan-400"></i>
+                Salvar no Histórico
+            </button>
+            <button type="button" onclick="generateReportView()" class="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-extrabold text-sm sm:text-base shadow-lg shadow-cyan-600/30 flex items-center justify-center gap-2 transition">
+                <i class="fa-solid fa-file-shield"></i>
+                Gerar Laudo de Inspeção (PDF)
+            </button>
+        </div>
+    </main>
+
+    <!-- ==================== VISUALIZAÇÃO DO LAUDO TÉCNICO (IMPRESSÃO / PDF) ==================== -->
+    <section id="report-view" class="hidden max-w-4xl mx-auto my-6 bg-white rounded-2xl shadow-xl border border-slate-200 p-6 sm:p-10">
+        <!-- Barra de controle superior (oculta na impressão) -->
+        <div class="flex flex-wrap items-center justify-between gap-3 pb-6 mb-6 border-b border-slate-200 no-print">
+            <button type="button" onclick="backToForm()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm flex items-center gap-2 transition">
+                <i class="fa-solid fa-arrow-left"></i>
+                Voltar e Editar
+            </button>
+            <div class="flex gap-2">
+                <button type="button" onclick="window.print()" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow flex items-center gap-2 transition">
+                    <i class="fa-solid fa-print"></i>
+                    Imprimir / Salvar PDF
+                </button>
+            </div>
+        </div>
+
+        <!-- Conteúdo dinâmico do Laudo -->
+        <div id="report-content"></div>
+    </section>
+
+    <!-- ==================== MODAL DE HISTÓRICO DE INSPEÇÕES ==================== -->
+    <div id="history-modal" class="fixed inset-0 z-50 hidden bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 no-print">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div class="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <i class="fa-solid fa-folder-open text-cyan-400"></i>
+                    <h3 class="font-bold text-base sm:text-lg">Inspeções Salvas no Dispositivo</h3>
+                </div>
+                <button type="button" onclick="toggleHistoryModal(false)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="history-list" class="p-5 overflow-y-auto space-y-3 flex-1">
+                <!-- Preenchido via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL DE VISUALIZAÇÃO DE FOTO AMPLIADA ==================== -->
+    <div id="photo-modal" class="fixed inset-0 z-50 hidden bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 no-print" onclick="closePhotoModal()">
+        <div class="relative max-w-3xl w-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between px-4 py-3 bg-slate-950 text-white">
+                <span id="photo-modal-title" class="text-sm font-bold truncate">Evidência Fotográfica</span>
+                <button type="button" onclick="closePhotoModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-2 flex items-center justify-center bg-black">
+                <img id="photo-modal-img" src="" alt="Foto ampliada" class="max-h-[75vh] w-auto rounded-lg object-contain">
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MODAL DE CONFIRMAÇÃO / ALERTA CUSTOMIZADO ==================== -->
+    <div id="dialog-modal" class="fixed inset-0 z-50 hidden bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 no-print">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md p-6 space-y-4">
+            <div class="flex items-start gap-3">
+                <div id="dialog-icon" class="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 flex items-center justify-center shrink-0 text-lg">
+                    <i class="fa-solid fa-circle-info"></i>
+                </div>
+                <div>
+                    <h4 id="dialog-title" class="font-extrabold text-slate-900 text-base">Aviso</h4>
+                    <p id="dialog-message" class="text-sm text-slate-600 mt-1 leading-relaxed"></p>
+                </div>
+            </div>
+            <div id="dialog-actions" class="flex justify-end gap-2 pt-2"></div>
+        </div>
+    </div>
+
+    <!-- ==================== TOAST NOTIFICATION ==================== -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none no-print">
+        <div class="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl border border-slate-700 flex items-center gap-2.5 text-sm font-semibold">
+            <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400"></i>
+            <span id="toast-text">Salvo com sucesso!</span>
+        </div>
+    </div>
+
+    <!-- ==================== LÓGICA DA APLICAÇÃO ==================== -->
+    <script>
+        // ==================== DADOS DO CHECKLIST (NR-36, NR-12, NR-13, BPF) ====================
+        const CHECKLIST_CATEGORIES = [
+            {
+                id: 'cat-nr13',
+                title: 'Caldeiras e Vasos de Pressão (NR-13 - Básico)',
+                norm: 'NR-13',
+                icon: 'fa-fire-burner',
+                items: [
+                    { id: 'nr13-1', text: 'Prontuário, Livro de Registro de Segurança e placa de identificação visíveis, legíveis e com inspeções periódicas em dia.' },
+                    { id: 'nr13-2', text: 'Válvulas de segurança e alívio lacradas, calibradas, desobstruídas e sem vazamentos ou bloqueios indevidos.' },
+                    { id: 'nr13-3', text: 'Manômetros, indicadores de nível de água e instrumentos de controle operantes, calibrados e com faixa de trabalho demarcada.' },
+                    { id: 'nr13-4', text: 'Tubulações de vapor e condensado com isolamento térmico íntegro (proteção contra queimaduras) e identificação de fluxo por cores.' },
+                    { id: 'nr13-5', text: 'Acesso seguro (escadas, guarda-corpos e plataformas desobstruídos) e sinalização de área restrita na casa de caldeiras/vasos.' }
+                ]
+            },
+            {
+                id: 'cat-amonia',
+                title: 'Sistema de Refrigeração e Amônia (NH₃)',
+                norm: 'NR-36 / NR-13 / NR-26',
+                icon: 'fa-biohazard',
+                items: [
+                    { id: 'nh3-1', text: 'Sensores fixos de detecção de amônia (NH₃) operantes, calibrados e interligados ao alarme sonoro e visual de emergência.' },
+                    { id: 'nh3-2', text: 'Ventilação mecânica de emergência e sistema de exaustão da sala de máquinas funcionando corretamente e sem obstruções.' },
+                    { id: 'nh3-3', text: 'Ausência de vazamentos perceptíveis (odor característico, manchas de óleo ou acúmulo anômalo de gelo em flanges, válvulas e selos).' },
+                    { id: 'nh3-4', text: 'Sinalização de segurança (Diamante de Hommel / risco químico), bloqueios e identificação clara das válvulas críticas de corte.' },
+                    { id: 'nh3-5', text: 'Chuveiro de emergência e lava-olhos desobstruídos, sinalizados e testados nas proximidades da sala de máquinas/amônia.' },
+                    { id: 'nh3-6', text: 'Biruta / indicador de direção do vento visível e iluminado para orientação da rota de fuga em caso de vazamento de gás.' }
+                ]
+            },
+            {
+                id: 'cat-nr12',
+                title: 'Máquinas e Equipamentos (NR-12)',
+                norm: 'NR-12 / NR-36',
+                icon: 'fa-gears',
+                items: [
+                    { id: 'nr12-1', text: 'Cordão de emergência (cabo de acionamento de parada) instalado ao longo das esteiras transportadoras, íntegro, tensionado, desobstruído e com rearme manual funcional.' },
+                    { id: 'nr12-2', text: 'Botões de parada de emergência (tipo cogumelo vermelho) desobstruídos, sinalizados e com rearme manual funcional.' },
+                    { id: 'nr12-3', text: 'Proteções fixas e móveis com intertravamento (sensores magnéticos/chaves de segurança) operantes em moedores, digestores e embaladoras.' },
+                    { id: 'nr12-4', text: 'Painéis elétricos fechados, sinalizados contra choque elétrico e protegidos contra umidade e jatos d’água.' }
+                ]
+            },
+            {
+                id: 'cat-nr23',
+                title: 'Proteção Contra Incêndio (NR-23 / RT CBMRS)',
+                norm: 'NR-23 / NBR 12693',
+                icon: 'fa-fire-extinguisher',
+                items: [
+                    { id: 'nr23-1', text: 'Extintores de incêndio desobstruídos, sinalizados, pressurizados (manômetro na faixa verde), lacrados e dentro do prazo de validade.' },
+                    { id: 'nr23-2', text: 'Hidrantes e abrigos de mangueiras desobstruídos, sinalizados, com mangueiras acondicionadas corretamente, esguichos e chaves completas.' },
+                    { id: 'nr23-3', text: 'Saídas de emergência, rotas de fuga e portas corta-fogo destrancadas, livres de obstáculos e com barras antipânico operantes.' },
+                    { id: 'nr23-4', text: 'Iluminação de emergência e placas fotoluminescentes de sinalização de rota de fuga íntegras, visíveis e funcionais.' },
+                    { id: 'nr23-5', text: 'Sistema de alarme de incêndio (acionadores manuais, sirenes e central) e detectores operantes, sem falhas ou bloqueios.' }
+                ]
+            },
+            {
+                id: 'cat-frio-bpf',
+                title: 'Câmaras Frias e Barreiras Sanitárias (BPF)',
+                norm: 'NR-36 / RDC 275 / MAPA',
+                icon: 'fa-temperature-arrow-down',
+                items: [
+                    { id: 'fbpf-1', text: 'Dispositivo mecânico de abertura interna (antipânico) e alarme de aprisionamento das câmaras frias desobstruídos e operantes.' },
+                    { id: 'fbpf-2', text: 'Pisos das câmaras, antecâmaras e áreas de circulação secos, sem acúmulo de gelo ou gordura (risco de queda) e cortinas de ar/PVC íntegras.' },
+                    { id: 'fbpf-3', text: 'Barreiras sanitárias (lava-botas, pedilúvio, lavatórios sem contato manual) e esterilizadores de facas (≥ 82,2°C) em pleno funcionamento.' }
+                ]
+            }
+        ];
+
+        // ==================== ESTADO DA APLICAÇÃO ====================
+        let inspectionState = {
+            id: null,
+            meta: {
+                unidade: 'Frigorífico Silva',
+                setor: 'Desossa e Sala de Cortes',
+                turno: '1º Turno (Manhã)',
+                inspetor: '',
+                supervisor: '',
+                datahora: '',
+                parecer: ''
+            },
+            items: {}, // { [itemId]: { status: 'C'|'NC'|'NA'|null, obs: '', photo: base64|null } }
+            generalPhotos: [], // [ { id, dataUrl, caption } ]
+            signatures: {
+                inspector: null,
+                supervisor: null
+            }
+        };
+
+        const STORAGE_DRAFT_KEY = 'frigosafe_current_draft_v2';
+        const STORAGE_HISTORY_KEY = 'frigosafe_history_v2';
+
+        // Instâncias dos quadros de assinatura
+        const sigPads = {
+            inspector: { canvas: null, ctx: null, drawing: false, hasStrokes: false },
+            supervisor: { canvas: null, ctx: null, drawing: false, hasStrokes: false }
+        };
+
+        // ==================== INICIALIZAÇÃO ====================
+        window.onload = function () {
+            initChecklistStructure();
+            loadDraftOrInit();
+            renderChecklist();
+            renderGeneralPhotos();
+            initSignaturePads();
+            updateStatsAndProgress();
+            updateHistoryBadge();
+        };
+
+        function initChecklistStructure() {
+            CHECKLIST_CATEGORIES.forEach(cat => {
+                cat.items.forEach(item => {
+                    if (!inspectionState.items[item.id]) {
+                        inspectionState.items[item.id] = { status: null, obs: '', photo: null };
+                    }
+                });
+            });
+        }
+
+        function setNowDateTime() {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            const formatted = now.toISOString().slice(0, 16);
+            document.getElementById('meta-datahora').value = formatted;
+            inspectionState.meta.datahora = formatted;
+            saveCurrentState();
+        }
+
+        function loadDraftOrInit() {
+            try {
+                const saved = localStorage.getItem(STORAGE_DRAFT_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    inspectionState = { ...inspectionState, ...parsed };
+                    initChecklistStructure();
+                } else {
+                    inspectionState.id = 'INSP-' + Date.now().toString().slice(-6);
+                    setNowDateTime();
+                }
+            } catch (e) {
+                console.warn('Erro ao carregar rascunho:', e);
+                inspectionState.id = 'INSP-' + Date.now().toString().slice(-6);
+                setNowDateTime();
+            }
+            populateMetaFields();
+        }
+
+        function populateMetaFields() {
+            const validUnits = ['Frigorífico Silva', 'Graxaria', 'Transportadora Arrieche'];
+            const savedUnit = inspectionState.meta.unidade;
+            document.getElementById('meta-unidade').value = validUnits.includes(savedUnit) ? savedUnit : 'Frigorífico Silva';
+            document.getElementById('meta-setor').value = inspectionState.meta.setor || 'Desossa e Sala de Cortes';
+            document.getElementById('meta-turno').value = inspectionState.meta.turno || '1º Turno (Manhã)';
+            document.getElementById('meta-inspetor').value = inspectionState.meta.inspetor || '';
+            document.getElementById('meta-supervisor').value = inspectionState.meta.supervisor || '';
+            document.getElementById('meta-parecer').value = inspectionState.meta.parecer || '';
+            if (inspectionState.meta.datahora) {
+                document.getElementById('meta-datahora').value = inspectionState.meta.datahora;
+            } else {
+                setNowDateTime();
+            }
+        }
+
+        function saveCurrentState() {
+            inspectionState.meta.unidade = document.getElementById('meta-unidade').value;
+            inspectionState.meta.setor = document.getElementById('meta-setor').value;
+            inspectionState.meta.turno = document.getElementById('meta-turno').value;
+            inspectionState.meta.inspetor = document.getElementById('meta-inspetor').value;
+            inspectionState.meta.supervisor = document.getElementById('meta-supervisor').value;
+            inspectionState.meta.datahora = document.getElementById('meta-datahora').value;
+            inspectionState.meta.parecer = document.getElementById('meta-parecer').value;
+
+            // Atualiza rótulos abaixo das assinaturas
+            document.getElementById('sig-inspector-label').textContent =
+                'Inspetor: ' + (inspectionState.meta.inspetor || 'Não informado');
+            document.getElementById('sig-supervisor-label').textContent =
+                'Supervisor: ' + (inspectionState.meta.supervisor || 'Não informado');
+
+            try {
+                localStorage.setItem(STORAGE_DRAFT_KEY, JSON.stringify(inspectionState));
+            } catch (e) {
+                showToast('Armazenamento local cheio. Exporte o laudo ou remova fotos antigas.', 'warning');
+            }
+        }
+
+        // ==================== RENDERIZAÇÃO DO CHECKLIST ====================
+        function renderChecklist() {
+            const container = document.getElementById('checklist-container');
+            container.innerHTML = '';
+
+            CHECKLIST_CATEGORIES.forEach((cat, catIndex) => {
+                const section = document.createElement('div');
+                section.className = 'bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden';
+
+                let itemsHtml = '';
+                cat.items.forEach((item, idx) => {
+                    const data = inspectionState.items[item.id] || { status: null, obs: '', photo: null };
+                    const isNC = data.status === 'NC';
+                    const isC = data.status === 'C';
+                    const isNA = data.status === 'NA';
+
+                    const borderClass = isNC
+                        ? 'border-l-4 border-l-rose-500 bg-rose-50/30'
+                        : isC
+                            ? 'border-l-4 border-l-emerald-500'
+                            : isNA
+                                ? 'border-l-4 border-l-slate-400 bg-slate-50/50'
+                                : 'border-l-4 border-l-transparent';
+
+                    itemsHtml += `
+                        <div id="row-${item.id}" class="p-4 sm:p-5 border-b border-slate-100 last:border-b-0 transition-colors ${borderClass}">
+                            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                                <div class="flex-1">
+                                    <div class="flex items-start gap-2.5">
+                                        <span class="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-slate-100 text-slate-600 font-bold text-xs shrink-0 mt-0.5">
+                                            ${catIndex + 1}.${idx + 1}
+                                        </span>
+                                        <p class="text-sm sm:text-base font-medium text-slate-800 leading-snug">${item.text}</p>
+                                    </div>
+                                </div>
+
+                                <!-- Botões de Avaliação (Touch-friendly) -->
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <button type="button" onclick="setItemStatus('${item.id}', 'C')"
+                                        class="flex-1 sm:flex-none px-3.5 py-2.5 rounded-xl font-bold text-xs sm:text-sm border transition flex items-center justify-center gap-1.5 ${isC ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'bg-white text-slate-600 border-slate-300 hover:bg-emerald-50 hover:text-emerald-700'}">
+                                        <i class="fa-solid fa-check"></i> Conforme
+                                    </button>
+                                    <button type="button" onclick="setItemStatus('${item.id}', 'NC')"
+                                        class="flex-1 sm:flex-none px-3.5 py-2.5 rounded-xl font-bold text-xs sm:text-sm border transition flex items-center justify-center gap-1.5 ${isNC ? 'bg-rose-600 text-white border-rose-600 shadow-sm' : 'bg-white text-slate-600 border-slate-300 hover:bg-rose-50 hover:text-rose-700'}">
+                                        <i class="fa-solid fa-triangle-exclamation"></i> Não Conf.
+                                    </button>
+                                    <button type="button" onclick="setItemStatus('${item.id}', 'NA')"
+                                        class="px-3 py-2.5 rounded-xl font-bold text-xs sm:text-sm border transition flex items-center justify-center ${isNA ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-500 border-slate-300 hover:bg-slate-100'}">
+                                        N/A
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Área de Evidência Fotográfica e Observação (Sempre visível em NC ou se já houver conteúdo) -->
+                            <div class="mt-3 pt-3 border-t border-slate-200/70 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 ${isNC || data.obs || data.photo ? '' : 'opacity-80'}">
+                                <div class="flex-1">
+                                    <input type="text" value="${escapeHtml(data.obs || '')}"
+                                        oninput="updateItemObs('${item.id}', this.value)"
+                                        placeholder="${isNC ? 'Descreva a não conformidade e ação corretiva imediata (Obrigatório)...' : 'Observação opcional deste item...'}"
+                                        class="w-full px-3.5 py-2 rounded-xl border ${isNC ? 'border-rose-300 bg-white focus:border-rose-500' : 'border-slate-200 bg-slate-50 focus:bg-white focus:border-cyan-500'} text-xs sm:text-sm outline-none">
+                                </div>
+
+                                <div class="flex items-center gap-2 shrink-0">
+                                    ${data.photo ? `
+                                        <div class="relative group flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-300">
+                                            <img src="${data.photo}" onclick="openPhotoModal('${data.photo}', 'Item ${catIndex + 1}.${idx + 1} - Evidência')"
+                                                class="w-11 h-11 rounded-lg object-cover cursor-pointer border border-slate-300" alt="Evidência">
+                                            <button type="button" onclick="removeItemPhoto('${item.id}')"
+                                                class="w-8 h-8 rounded-lg bg-rose-100 hover:bg-rose-600 text-rose-700 hover:text-white flex items-center justify-center transition" title="Remover foto">
+                                                <i class="fa-solid fa-trash-can text-xs"></i>
+                                            </button>
+                                        </div>
+                                    ` : `
+                                        <label for="photo-${item.id}" class="cursor-pointer px-3.5 py-2 rounded-xl ${isNC ? 'bg-rose-100 hover:bg-rose-200 text-rose-800 border-rose-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'} border text-xs font-bold flex items-center justify-center gap-1.5 transition">
+                                            <i class="fa-solid fa-camera"></i>
+                                            <span>Foto Evidência</span>
+                                        </label>
+                                        <input type="file" id="photo-${item.id}" accept="image/*" capture="environment" class="hidden" onchange="handleItemPhotoUpload('${item.id}', event)">
+                                    `}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                section.innerHTML = `
+                    <div class="bg-slate-800 text-white px-5 py-3 flex items-center justify-between">
+                        <div class="flex items-center gap-2.5">
+                            <i class="fa-solid ${cat.icon} text-cyan-400"></i>
+                            <h3 class="font-bold text-sm sm:text-base">${cat.title}</h3>
+                        </div>
+                        <span class="text-[11px] font-bold bg-slate-700 text-cyan-300 px-2.5 py-0.5 rounded-full border border-slate-600">
+                            ${cat.norm}
+                        </span>
+                    </div>
+                    <div>${itemsHtml}</div>
+                `;
+                container.appendChild(section);
+            });
+        }
+
+        function setItemStatus(itemId, status) {
+            const current = inspectionState.items[itemId].status;
+            inspectionState.items[itemId].status = (current === status) ? null : status;
+            saveCurrentState();
+            renderChecklist();
+            updateStatsAndProgress();
+        }
+
+        function markAllAs(status) {
+            CHECKLIST_CATEGORIES.forEach(cat => {
+                cat.items.forEach(item => {
+                    inspectionState.items[item.id].status = status;
+                });
+            });
+            saveCurrentState();
+            renderChecklist();
+            updateStatsAndProgress();
+            showToast('Todos os itens marcados como Conformes.');
+        }
+
+        function updateItemObs(itemId, val) {
+            inspectionState.items[itemId].obs = val;
+            saveCurrentState();
+        }
+
+        function updateStatsAndProgress() {
+            let total = 0, answered = 0, c = 0, nc = 0, na = 0;
+
+            CHECKLIST_CATEGORIES.forEach(cat => {
+                cat.items.forEach(item => {
+                    total++;
+                    const st = inspectionState.items[item.id]?.status;
+                    if (st) answered++;
+                    if (st === 'C') c++;
+                    if (st === 'NC') nc++;
+                    if (st === 'NA') na++;
+                });
+            });
+
+            const pct = total > 0 ? Math.round((answered / total) * 100) : 0;
+            document.getElementById('progress-bar').style.width = pct + '%';
+            document.getElementById('progress-text').textContent = `${answered} / ${total} itens`;
+
+            document.getElementById('stat-c').textContent = c;
+            document.getElementById('stat-nc').textContent = nc;
+            document.getElementById('stat-na').textContent = na;
+
+            const validItems = c + nc;
+            const compliance = validItems > 0 ? Math.round((c / validItems) * 100) + '%' : '--%';
+            document.getElementById('stat-score').textContent = compliance;
+        }
+
+        // ==================== COMPRESSÃO E GESTÃO DE FOTOS ====================
+        function compressImage(file, maxWidth = 900, quality = 0.72) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    const img = new Image();
+                    img.onload = function () {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > maxWidth) {
+                            height = Math.round((height * maxWidth) / width);
+                            width = maxWidth;
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        // Carimbo de data/hora discreto no canto da foto
+                        const timestamp = new Date().toLocaleString('pt-BR');
+                        ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
+                        ctx.fillRect(8, height - 28, 175, 20);
+                        ctx.fillStyle = '#38bdf8';
+                        ctx.font = 'bold 11px Inter, sans-serif';
+                        ctx.fillText(timestamp, 14, height - 14);
+
+                        resolve(canvas.toDataURL('image/jpeg', quality));
+                    };
+                    img.onerror = reject;
+                    img.src = event.target.result;
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function handleItemPhotoUpload(itemId, event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            try {
+                const compressed = await compressImage(file);
+                inspectionState.items[itemId].photo = compressed;
+                saveCurrentState();
+                renderChecklist();
+                showToast('Foto de evidência anexada ao item.');
+            } catch (err) {
+                showToast('Erro ao processar imagem.', 'error');
+            }
+        }
+
+        function removeItemPhoto(itemId) {
+            inspectionState.items[itemId].photo = null;
+            saveCurrentState();
+            renderChecklist();
+        }
+
+        async function handleGeneralPhotoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            try {
+                const compressed = await compressImage(file);
+                inspectionState.generalPhotos.push({
+                    id: 'GP-' + Date.now(),
+                    dataUrl: compressed,
+                    caption: ''
+                });
+                saveCurrentState();
+                renderGeneralPhotos();
+                showToast('Foto geral adicionada.');
+            } catch (err) {
+                showToast('Erro ao processar foto.', 'error');
+            } finally {
+                event.target.value = '';
+            }
+        }
+
+        function updateGeneralPhotoCaption(photoId, caption) {
+            const photo = inspectionState.generalPhotos.find(p => p.id === photoId);
+            if (photo) {
+                photo.caption = caption;
+                saveCurrentState();
+            }
+        }
+
+        function removeGeneralPhoto(photoId) {
+            inspectionState.generalPhotos = inspectionState.generalPhotos.filter(p => p.id !== photoId);
+            saveCurrentState();
+            renderGeneralPhotos();
+        }
+
+        function renderGeneralPhotos() {
+            const grid = document.getElementById('general-photos-grid');
+            if (inspectionState.generalPhotos.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full py-8 border-2 border-dashed border-slate-200 rounded-2xl text-center text-slate-400">
+                        <i class="fa-regular fa-images text-3xl mb-2 block text-slate-300"></i>
+                        <p class="text-sm font-medium">Nenhuma foto geral anexada ainda.</p>
+                        <p class="text-xs mt-1">Use o botão "Adicionar Foto" acima para registrar panorâmicas do setor.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = inspectionState.generalPhotos.map((photo, index) => `
+                <div class="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden flex flex-col">
+                    <div class="relative h-44 bg-slate-900">
+                        <img src="${photo.dataUrl}" onclick="openPhotoModal('${photo.dataUrl}', 'Registro Geral #${index + 1}')"
+                            class="w-full h-full object-cover cursor-pointer" alt="Registro fotográfico">
+                        <button type="button" onclick="removeGeneralPhoto('${photo.id}')"
+                            class="absolute top-2 right-2 w-8 h-8 rounded-xl bg-rose-600/90 hover:bg-rose-600 text-white flex items-center justify-center shadow">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                    <div class="p-2.5">
+                        <input type="text" value="${escapeHtml(photo.caption)}"
+                            oninput="updateGeneralPhotoCaption('${photo.id}', this.value)"
+                            placeholder="Legenda da foto #${index + 1}..."
+                            class="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 outline-none focus:border-cyan-500">
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // ==================== ASSINATURA DIGITAL (CANVAS TOUCH / MOUSE) ====================
+        function initSignaturePads() {
+            ['inspector', 'supervisor'].forEach(role => {
+                const canvas = document.getElementById(`sig-${role}`);
+                const ctx = canvas.getContext('2d');
+                sigPads[role].canvas = canvas;
+                sigPads[role].ctx = ctx;
+
+                resizeSingleCanvas(role);
+
+                // Eventos de Mouse
+                canvas.addEventListener('mousedown', e => startDraw(role, e));
+                canvas.addEventListener('mousemove', e => drawMove(role, e));
+                window.addEventListener('mouseup', () => endDraw(role));
+
+                // Eventos Touch (Mobile / Tablet)
+                canvas.addEventListener('touchstart', e => {
+                    e.preventDefault();
+                    startDraw(role, e.touches[0]);
+                }, { passive: false });
+
+                canvas.addEventListener('touchmove', e => {
+                    e.preventDefault();
+                    drawMove(role, e.touches[0]);
+                }, { passive: false });
+
+                canvas.addEventListener('touchend', () => endDraw(role));
+            });
+
+            window.addEventListener('resize', () => {
+                ['inspector', 'supervisor'].forEach(role => resizeSingleCanvas(role));
+            });
+        }
+
+        function resizeSingleCanvas(role) {
+            const pad = sigPads[role];
+            const canvas = pad.canvas;
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+
+            const savedData = inspectionState.signatures[role];
+
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            pad.ctx.scale(dpr, dpr);
+            pad.ctx.lineWidth = 2.4;
+            pad.ctx.lineCap = 'round';
+            pad.ctx.lineJoin = 'round';
+            pad.ctx.strokeStyle = '#0f172a';
+
+            if (savedData) {
+                const img = new Image();
+                img.onload = () => {
+                    pad.ctx.drawImage(img, 0, 0, rect.width, rect.height);
+                    pad.hasStrokes = true;
+                    document.getElementById(`sig-${role}-placeholder`).classList.add('hidden');
+                };
+                img.src = savedData;
+            }
+        }
+
+        function getCanvasCoords(canvas, clientEvent) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: clientEvent.clientX - rect.left,
+                y: clientEvent.clientY - rect.top
+            };
+        }
+
+        function startDraw(role, clientEvent) {
+            const pad = sigPads[role];
+            pad.drawing = true;
+            pad.hasStrokes = true;
+            document.getElementById(`sig-${role}-placeholder`).classList.add('hidden');
+            const pos = getCanvasCoords(pad.canvas, clientEvent);
+            pad.ctx.beginPath();
+            pad.ctx.moveTo(pos.x, pos.y);
+        }
+
+        function drawMove(role, clientEvent) {
+            const pad = sigPads[role];
+            if (!pad.drawing) return;
+            const pos = getCanvasCoords(pad.canvas, clientEvent);
+            pad.ctx.lineTo(pos.x, pos.y);
+            pad.ctx.stroke();
+        }
+
+        function endDraw(role) {
+            const pad = sigPads[role];
+            if (!pad.drawing) return;
+            pad.drawing = false;
+            if (pad.hasStrokes) {
+                inspectionState.signatures[role] = pad.canvas.toDataURL('image/png');
+                saveCurrentState();
+            }
+        }
+
+        function clearSignature(role) {
+            const pad = sigPads[role];
+            const rect = pad.canvas.parentElement.getBoundingClientRect();
+            pad.ctx.clearRect(0, 0, rect.width, rect.height);
+            pad.hasStrokes = false;
+            inspectionState.signatures[role] = null;
+            document.getElementById(`sig-${role}-placeholder`).classList.remove('hidden');
+            saveCurrentState();
+        }
+
+        // ==================== GERAÇÃO DO LAUDO TÉCNICO ====================
+        function generateReportView() {
+            saveCurrentState();
+            const m = inspectionState.meta;
+
+            if (!m.unidade.trim() || !m.inspetor.trim()) {
+                showDialog('Campos Obrigatórios', 'Por favor, preencha ao menos o nome do Técnico/Inspetor SST e selecione a Unidade/Empresa antes de gerar o laudo.', 'warning');
+                return;
+            }
+
+            let total = 0, c = 0, nc = 0, na = 0;
+            CHECKLIST_CATEGORIES.forEach(cat => {
+                cat.items.forEach(item => {
+                    total++;
+                    const st = inspectionState.items[item.id]?.status;
+                    if (st === 'C') c++;
+                    else if (st === 'NC') nc++;
+                    else if (st === 'NA') na++;
+                });
+            });
+
+            const applicable = c + nc;
+            const score = applicable > 0 ? Math.round((c / applicable) * 100) : 100;
+            const formattedDate = m.datahora ? new Date(m.datahora).toLocaleString('pt-BR') : new Date().toLocaleString('pt-BR');
+
+            let categoriesReportHtml = '';
+            CHECKLIST_CATEGORIES.forEach((cat, catIdx) => {
+                let rowsHtml = '';
+                cat.items.forEach((item, idx) => {
+                    const data = inspectionState.items[item.id] || {};
+                    const st = data.status;
+                    const badge = st === 'C'
+                        ? '<span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-xs">CONFORME</span>'
+                        : st === 'NC'
+                            ? '<span class="px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-bold text-xs">NÃO CONFORME</span>'
+                            : st === 'NA'
+                                ? '<span class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-bold text-xs">N/A</span>'
+                                : '<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-xs">PENDENTE</span>';
+
+                    rowsHtml += `
+                        <tr class="border-b border-slate-200 page-break-inside-avoid ${st === 'NC' ? 'bg-rose-50/50' : ''}">
+                            <td class="py-2.5 px-3 text-xs font-bold text-slate-500 align-top">${catIdx + 1}.${idx + 1}</td>
+                            <td class="py-2.5 px-3 text-xs text-slate-800 align-top">
+                                <div class="font-medium">${item.text}</div>
+                                ${data.obs ? `<div class="mt-1 text-slate-600 italic"><strong class="text-slate-700 not-italic">Obs:</strong> ${escapeHtml(data.obs)}</div>` : ''}
+                                ${data.photo ? `<div class="mt-2"><img src="${data.photo}" class="h-28 w-auto rounded-lg border border-slate-300 object-cover"></div>` : ''}
+                            </td>
+                            <td class="py-2.5 px-3 text-right align-top whitespace-nowrap">${badge}</td>
+                        </tr>
+                    `;
+                });
+
+                categoriesReportHtml += `
+                    <div class="mb-6 page-break-inside-avoid">
+                        <div class="bg-slate-800 text-white px-4 py-2 rounded-t-xl flex justify-between items-center">
+                            <span class="font-bold text-sm">${cat.title}</span>
+                            <span class="text-xs text-cyan-300 font-semibold">${cat.norm}</span>
+                        </div>
+                        <table class="w-full border border-slate-200 border-t-0 rounded-b-xl overflow-hidden">
+                            <tbody>${rowsHtml}</tbody>
+                        </table>
+                    </div>
+                `;
+            });
+
+            let generalPhotosReportHtml = '';
+            if (inspectionState.generalPhotos.length > 0) {
+                generalPhotosReportHtml = `
+                    <div class="mb-6 page-break-inside-avoid">
+                        <h3 class="font-bold text-sm uppercase tracking-wider text-slate-800 border-b-2 border-slate-800 pb-1 mb-3">
+                            Registro Fotográfico Complementar
+                        </h3>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                            ${inspectionState.generalPhotos.map((p, i) => `
+                                <div class="border border-slate-200 rounded-xl p-2 bg-slate-50">
+                                    <img src="${p.dataUrl}" class="w-full h-36 object-cover rounded-lg mb-1.5">
+                                    <p class="text-[11px] text-slate-700 font-medium">${escapeHtml(p.caption || 'Registro #' + (i + 1))}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            document.getElementById('report-content').innerHTML = `
+                <!-- Cabeçalho Institucional do Laudo -->
+                <div class="border-b-2 border-slate-900 pb-5 mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <div class="text-xs font-extrabold uppercase tracking-wider text-slate-900">FRIGORÍFICO SILVA INDÚSTRIA E COMÉRCIO LTDA</div>
+                        <div class="text-[11px] font-bold uppercase tracking-widest text-cyan-700 mt-0.5">Relatório Técnico de Inspeção SST & Sanitária</div>
+                        <h1 class="text-2xl font-black text-slate-900 mt-1">LAUDO DE CONFORMIDADE OPERACIONAL</h1>
+                        <p class="text-xs text-slate-500 mt-0.5">Referências Normativas: NR-12 • NR-13 (Caldeiras/Vasos) • NR-23 (Incêndio) • NH₃ • Boas Práticas (BPF)</p>
+                    </div>
+                    <div class="text-left sm:text-right bg-slate-100 px-4 py-2.5 rounded-xl border border-slate-200">
+                        <div class="text-[11px] font-bold text-slate-500 uppercase">Protocolo</div>
+                        <div class="text-base font-black text-slate-900">${inspectionState.id}</div>
+                        <div class="text-xs text-slate-600">${formattedDate}</div>
+                    </div>
+                </div>
+
+                <!-- Dados de Identificação -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 text-sm">
+                    <div><span class="font-bold text-slate-600">Unidade / Empresa:</span> <span class="font-semibold text-slate-900">${escapeHtml(m.unidade)}</span></div>
+                    <div><span class="font-bold text-slate-600">Setor Inspecionado:</span> <span class="font-semibold text-slate-900">${escapeHtml(m.setor)}</span></div>
+                    <div><span class="font-bold text-slate-600">Turno:</span> <span class="text-slate-900">${escapeHtml(m.turno)}</span></div>
+                    <div><span class="font-bold text-slate-600">Inspetor SST:</span> <span class="text-slate-900">${escapeHtml(m.inspetor)}</span></div>
+                    <div class="sm:col-span-2"><span class="font-bold text-slate-600">Supervisor Acompanhante:</span> <span class="text-slate-900">${escapeHtml(m.supervisor || 'Não informado')}</span></div>
+                </div>
+
+                <!-- Resumo Estatístico -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 page-break-inside-avoid">
+                    <div class="p-3.5 rounded-xl border border-emerald-200 bg-emerald-50 text-center">
+                        <div class="text-2xl font-black text-emerald-700">${c}</div>
+                        <div class="text-xs font-bold text-emerald-800 uppercase">Conformes</div>
+                    </div>
+                    <div class="p-3.5 rounded-xl border border-rose-200 bg-rose-50 text-center">
+                        <div class="text-2xl font-black text-rose-700">${nc}</div>
+                        <div class="text-xs font-bold text-rose-800 uppercase">Não Conformes</div>
+                    </div>
+                    <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-100 text-center">
+                        <div class="text-2xl font-black text-slate-700">${na}</div>
+                        <div class="text-xs font-bold text-slate-600 uppercase">Não Aplicável</div>
+                    </div>
+                    <div class="p-3.5 rounded-xl border border-cyan-200 bg-cyan-50 text-center">
+                        <div class="text-2xl font-black text-cyan-700">${score}%</div>
+                        <div class="text-xs font-bold text-cyan-800 uppercase">Índice Conformidade</div>
+                    </div>
+                </div>
+
+                <!-- Itens Inspecionados -->
+                ${categoriesReportHtml}
+
+                <!-- Fotos Gerais -->
+                ${generalPhotosReportHtml}
+
+                <!-- Parecer Técnico -->
+                <div class="mb-8 p-4 rounded-xl border border-slate-300 bg-slate-50 page-break-inside-avoid">
+                    <h3 class="font-bold text-xs uppercase tracking-wider text-slate-700 mb-1.5">Parecer Técnico & Recomendações</h3>
+                    <p class="text-sm text-slate-800 whitespace-pre-line">${escapeHtml(m.parecer || 'Nenhuma observação adicional registrada.')}</p>
+                </div>
+
+                <!-- Bloco de Assinaturas -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-4 page-break-inside-avoid">
+                    <div class="text-center">
+                        <div class="h-28 border-b-2 border-slate-800 flex items-center justify-center mb-2">
+                            ${inspectionState.signatures.inspector
+                                ? `<img src="${inspectionState.signatures.inspector}" class="max-h-24 w-auto object-contain" alt="Assinatura Inspetor">`
+                                : `<span class="text-xs text-slate-400 italic">[Assinatura pendente]</span>`}
+                        </div>
+                        <div class="font-bold text-sm text-slate-900">${escapeHtml(m.inspetor)}</div>
+                        <div class="text-xs text-slate-500">Técnico / Inspetor de Segurança do Trabalho</div>
+                    </div>
+
+                    <div class="text-center">
+                        <div class="h-28 border-b-2 border-slate-800 flex items-center justify-center mb-2">
+                            ${inspectionState.signatures.supervisor
+                                ? `<img src="${inspectionState.signatures.supervisor}" class="max-h-24 w-auto object-contain" alt="Assinatura Supervisor">`
+                                : `<span class="text-xs text-slate-400 italic">[Assinatura pendente]</span>`}
+                        </div>
+                        <div class="font-bold text-sm text-slate-900">${escapeHtml(m.supervisor || 'Responsável do Setor')}</div>
+                        <div class="text-xs text-slate-500">Supervisor / Encarregado da Área</div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('form-view').classList.add('hidden');
+            document.getElementById('report-view').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function backToForm() {
+            document.getElementById('report-view').classList.add('hidden');
+            document.getElementById('form-view').classList.remove('hidden');
+            ['inspector', 'supervisor'].forEach(role => resizeSingleCanvas(role));
+        }
+
+        // ==================== HISTÓRICO E NOVA INSPEÇÃO ====================
+        function getHistory() {
+            try {
+                return JSON.parse(localStorage.getItem(STORAGE_HISTORY_KEY)) || [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function updateHistoryBadge() {
+            document.getElementById('history-badge').textContent = getHistory().length;
+        }
+
+        function saveInspectionToHistory() {
+            saveCurrentState();
+            const history = getHistory();
+            const existingIdx = history.findIndex(h => h.id === inspectionState.id);
+            const snapshot = JSON.parse(JSON.stringify(inspectionState));
+            snapshot.savedAt = new Date().toISOString();
+
+            if (existingIdx >= 0) {
+                history[existingIdx] = snapshot;
+            } else {
+                history.unshift(snapshot);
+            }
+
+            try {
+                localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify(history.slice(0, 20)));
+                updateHistoryBadge();
+                showToast('Inspeção salva no histórico local!');
+            } catch (e) {
+                showToast('Limite de memória atingido. Exporte em PDF.', 'error');
+            }
+        }
+
+        function toggleHistoryModal(show) {
+            const modal = document.getElementById('history-modal');
+            if (!show) {
+                modal.classList.add('hidden');
+                return;
+            }
+
+            const history = getHistory();
+            const list = document.getElementById('history-list');
+
+            if (history.length === 0) {
+                list.innerHTML = `
+                    <div class="text-center py-10 text-slate-400">
+                        <i class="fa-solid fa-folder-open text-4xl mb-2 text-slate-300"></i>
+                        <p class="font-semibold text-sm">Nenhuma inspeção salva no histórico ainda.</p>
+                    </div>
+                `;
+            } else {
+                list.innerHTML = history.map(item => `
+                    <div class="p-4 rounded-xl border border-slate-200 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-black bg-cyan-100 text-cyan-800 px-2 py-0.5 rounded">${item.id}</span>
+                                <span class="font-bold text-sm text-slate-900">${escapeHtml(item.meta.unidade)}</span>
+                            </div>
+                            <div class="text-xs text-slate-600 mt-1">
+                                <strong>Setor:</strong> ${escapeHtml(item.meta.setor)} • <strong>Inspetor:</strong> ${escapeHtml(item.meta.inspetor || 'N/I')}
+                            </div>
+                            <div class="text-[11px] text-slate-400 mt-0.5">
+                                Data: ${item.meta.datahora ? new Date(item.meta.datahora).toLocaleString('pt-BR') : '-'}
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button type="button" onclick="loadInspectionFromHistory('${item.id}')" class="px-3 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold">
+                                Abrir
+                            </button>
+                            <button type="button" onclick="deleteInspectionFromHistory('${item.id}')" class="px-3 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function loadInspectionFromHistory(id) {
+            const found = getHistory().find(h => h.id === id);
+            if (!found) return;
+
+            inspectionState = JSON.parse(JSON.stringify(found));
+            initChecklistStructure();
+            populateMetaFields();
+            renderChecklist();
+            renderGeneralPhotos();
+            ['inspector', 'supervisor'].forEach(role => {
+                const pad = sigPads[role];
+                const rect = pad.canvas.parentElement.getBoundingClientRect();
+                pad.ctx.clearRect(0, 0, rect.width, rect.height);
+                pad.hasStrokes = false;
+                document.getElementById(`sig-${role}-placeholder`).classList.remove('hidden');
+                resizeSingleCanvas(role);
+            });
+            updateStatsAndProgress();
+            saveCurrentState();
+            toggleHistoryModal(false);
+            backToForm();
+            showToast(`Inspeção ${id} carregada.`);
+        }
+
+        function deleteInspectionFromHistory(id) {
+            const updated = getHistory().filter(h => h.id !== id);
+            localStorage.setItem(STORAGE_HISTORY_KEY, JSON.stringify(updated));
+            updateHistoryBadge();
+            toggleHistoryModal(true);
+            showToast('Registro removido do histórico.');
+        }
+
+        function resetNewInspection() {
+            showDialog(
+                'Iniciar Nova Inspeção',
+                'Deseja limpar o formulário atual e iniciar uma nova ronda de inspeção? Certifique-se de ter salvo no histórico se precisar manter os dados atuais.',
+                'confirm',
+                () => {
+                    localStorage.removeItem(STORAGE_DRAFT_KEY);
+                    inspectionState = {
+                        id: 'INSP-' + Date.now().toString().slice(-6),
+                        meta: {
+                            unidade: inspectionState.meta.unidade || 'Frigorífico Silva',
+                            setor: 'Desossa e Sala de Cortes',
+                            turno: '1º Turno (Manhã)',
+                            inspetor: inspectionState.meta.inspetor,
+                            supervisor: '',
+                            datahora: '',
+                            parecer: ''
+                        },
+                        items: {},
+                        generalPhotos: [],
+                        signatures: { inspector: null, supervisor: null }
+                    };
+                    initChecklistStructure();
+                    populateMetaFields();
+                    setNowDateTime();
+                    renderChecklist();
+                    renderGeneralPhotos();
+                    clearSignature('inspector');
+                    clearSignature('supervisor');
+                    updateStatsAndProgress();
+                    backToForm();
+                    showToast('Nova inspeção iniciada!');
+                }
+            );
+        }
+
+        // ==================== UTILITÁRIOS DE UI ====================
+        function openPhotoModal(src, title) {
+            document.getElementById('photo-modal-img').src = src;
+            document.getElementById('photo-modal-title').textContent = title || 'Evidência Fotográfica';
+            document.getElementById('photo-modal').classList.remove('hidden');
+        }
+
+        function closePhotoModal() {
+            document.getElementById('photo-modal').classList.add('hidden');
+        }
+
+        function showDialog(title, message, type = 'info', onConfirm = null) {
+            document.getElementById('dialog-title').textContent = title;
+            document.getElementById('dialog-message').textContent = message;
+            const actions = document.getElementById('dialog-actions');
+
+            if (type === 'confirm') {
+                actions.innerHTML = `
+                    <button type="button" onclick="closeDialog()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm">Cancelar</button>
+                    <button type="button" id="dialog-confirm-btn" class="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-sm">Confirmar</button>
+                `;
+                document.getElementById('dialog-confirm-btn').onclick = () => {
+                    closeDialog();
+                    if (onConfirm) onConfirm();
+                };
+            } else {
+                actions.innerHTML = `
+                    <button type="button" onclick="closeDialog()" class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm">Entendi</button>
+                `;
+            }
+
+            document.getElementById('dialog-modal').classList.remove('hidden');
+        }
+
+        function closeDialog() {
+            document.getElementById('dialog-modal').classList.add('hidden');
+        }
+
+        let toastTimeout;
+        function showToast(text, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            document.getElementById('toast-text').textContent = text;
+
+            icon.className = type === 'error'
+                ? 'fa-solid fa-circle-xmark text-rose-400'
+                : type === 'warning'
+                    ? 'fa-solid fa-triangle-exclamation text-amber-400'
+                    : 'fa-solid fa-circle-check text-emerald-400';
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+    </script>
+</body>
+</html>
